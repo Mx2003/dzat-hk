@@ -61,6 +61,40 @@ class RAGEngine:
         """格式化 FAQ 为 LLM 参考文本。"""
         return "\n".join(f"- {k}: {v}" for k, v in _FAQ_KNOWLEDGE.items())
 
+    # ── FAQ 关键词快速匹配 ──────────────────────
+
+    def _faq_match(self, text: str) -> Optional[str]:
+        """关键词快速匹配 FAQ — 只用英文/中文关键词（B2B 通用术语）。
+
+        只有消息明显是英文或中文时才走快速匹配，避免在日语/西语等
+        消息中误匹配（比如日语消息包含 "MOQ" 不是英文对话）。
+        """
+        lowered = text.lower()
+
+        # 快速判断：如果消息有大量非英文字符，很可能是其他语言
+        non_en = sum(1 for c in text if c > '\x7f')
+        total = len(text)
+        # 超过 20% 非 ASCII 字符 → 跳过快速匹配，走 LLM
+        if total > 5 and non_en / total > 0.2:
+            return None
+
+        keywords = {
+            "moq": ["moq", "minimum order", "min order", "起订量", "最少订", "多少量"],
+            "pricing": ["price", "pricing", "cost", "报价", "价格", "多少钱", "how much"],
+            "lead_time": ["lead time", "delivery", "交期", "多久交货"],
+            "sample": ["sample", "样品", "样板", "muster", "サンプル"],
+            "payment": ["payment", "付款", "deposit", "定金"],
+            "warranty": ["warranty", "保修", "guarantee"],
+            "factory": ["factory", "visit", "参观"],
+            "oem_odm": ["oem", "odm", "定制", "custom", "カスタム"],
+            "certification": ["certification", "认证", "fda", "ce", "rohs"],
+        }
+        for topic, kws in keywords.items():
+            if any(kw in lowered for kw in kws):
+                logger.info(f"[RAG] FAQ match: {topic}")
+                return _FAQ_KNOWLEDGE.get(topic)
+        return None
+
     # ── 意图分类（多语言关键词）─────────────────
 
     # 意图关键词覆盖：英/中/西/法/德/阿/葡/俄/日/韩
@@ -129,7 +163,8 @@ class RAGEngine:
     def generate_reply(self, message: str, conversation_history: list[dict] = None) -> str:
         """DeepSeek 生成多语言客服回复。
 
-        自动检测客户语言，FAQ 参考，以客户语言回复。
+        自动检测客户语言并以同语言回复。FAQ 匹配也由 LLM 完成，
+        避免关键词在非英文消息中误匹配导致返回英文答案。
         """
         knowledge = self._knowledge[:3000] or self._format_faq_knowledge()
 
@@ -147,21 +182,28 @@ class RAGEngine:
 Products: Disposable vapes, pod systems, CBD/THC devices, dry herb vaporizers.
 Advantages: 45-day R&D cycle, 4M monthly capacity, flexible ODM/OEM, transparent pricing.
 
-Company reference knowledge:
-{knowledge}
-
-FAQ quick reference:
+FAQ quick reference (use as needed, adapt to customer's language):
 {self._format_faq_knowledge()}
 
-CRITICAL INSTRUCTIONS:
-1. DETECT the customer's language from their message and REPLY IN THAT SAME LANGUAGE.
-2. If the customer writes in Spanish, reply in Spanish. If French, reply in French. If Arabic, reply in Arabic. etc.
-3. Never reply in English to a non-English message.
-4. Be professional, warm, concise. 2-4 sentences max.
-5. If the customer asks for a human, suggest transferring and ask them to wait.
-6. For pricing/MOQ beyond your knowledge, invite the customer to discuss details with a specialist.
-7. Never make up specifications or prices you don't know.
-8. End with an engaging question when appropriate."""
+Company knowledge:
+{knowledge}
+
+CRITICAL LANGUAGE RULES (highest priority):
+1. Look at the CURRENT customer message to determine the language. Reply in THAT language.
+2. Even if the conversation history is in a different language, always use the language of the LATEST customer message.
+3. If a customer switches from English to Japanese mid-conversation, you MUST switch to Japanese too.
+4. NEVER reply in English when the current message is not in English.
+5. Be professional, warm, concise. 2-4 sentences max.
+6. If the customer asks for a human, suggest transferring and ask them to wait.
+7. For pricing/MOQ beyond your knowledge, invite the customer to discuss details with a specialist.
+8. Never make up specifications or prices you don't know.
+9. End with an engaging question when appropriate."""
+
+        # 先 FAQ 快速匹配 — 但如果客户消息不是纯英文/中文则跳过（避免误匹配）
+        faq = self._faq_match(message)
+        if faq:
+            # FAQ 命中 → 让 LLM 翻译成客户语言
+            return self._translate_faq(faq, message)
 
         messages = [{"role": "system", "content": system}]
         if history_text:
@@ -186,6 +228,39 @@ CRITICAL INSTRUCTIONS:
 
         # 降级：尝试用客户语言返回通用消息
         return self._multilingual_fallback(message)
+
+    def _translate_faq(self, faq_text: str, customer_message: str) -> str:
+        """用 LLM 把 FAQ 答案翻译成客户语言。"""
+        prompt = f"""Translate this FAQ answer to match the language of the customer's message.
+Customer message: "{customer_message[:200]}"
+
+FAQ answer (English):
+{faq_text}
+
+Reply ONLY with the translated text in the customer's language. Keep it concise and professional."""
+
+        try:
+            resp = requests.post(
+                f"{self._base_url}/chat/completions",
+                headers=self._headers,
+                json={
+                    "model": self._model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.3,
+                    "max_tokens": 300,
+                },
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+                if content.strip():
+                    logger.info(f"[RAG] Translated FAQ to customer language")
+                    return content.strip()
+        except Exception as e:
+            logger.warning(f"[RAG] FAQ translation failed: {e}")
+
+        # 翻译失败，走完整 LLM
+        return self.generate_reply(customer_message, None)
 
     def _multilingual_fallback(self, message: str) -> str:
         """生成多语言降级回复。用简单启发式判断语言。"""
