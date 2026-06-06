@@ -1,0 +1,128 @@
+[
+    {
+        "rows": [
+            [
+                {
+                    "name": "name"
+                },
+                {
+                    "name": "accountName"
+                }
+            ],
+            [
+                {
+                    "name": "cSourceKeywords"
+                },
+                {
+                    "name": "cPhone"
+                }
+            ],
+            [
+                {
+                    "name": "addressCountry"
+                },
+                {
+                    "name": "website"
+                }
+            ],
+            [
+                {
+                    "name": "addressCity"
+                },
+                {
+                    "name": "cProductLine"
+                }
+            ],
+            [
+                {
+                    "name": "cLinkedin"
+                },
+                {
+                    "name": "cInstagram"
+                }
+            ],
+            [
+                {
+                    "name": "cWhatsapp"
+                },
+                {
+                    "name": "cXHandle"
+                }
+            ],
+            [
+                {
+                    "name": "cTiktok"
+                },
+                {
+                    "name": "cFacebook"
+                }
+            ],
+            [
+                {
+                    "name": "streamUpdatedAt"
+                },
+                {
+                    "name": "cSourceUrl"
+                }
+            ]
+        ],
+        "style": "default",
+        "label": "Overview"
+    },
+    {
+        "rows": [
+            [
+                {
+                    "name": "status"
+                },
+                {
+                    "name": "source"
+                }
+            ],
+            [
+                {
+                    "name": "cDevPriority"
+                },
+                {
+                    "name": "cCustomerPortrait"
+                }
+            ],
+            [
+                {
+                    "name": "industry"
+                },
+                {
+                    "name": "emailAddress"
+                }
+            ],
+            [
+                {
+                    "name": "description"
+                }
+            ]
+        ],
+        "style": "default",
+        "label": "Details"
+    },
+    {
+        "rows": [
+            [
+                {
+                    "name": "cLeadScore"
+                },
+                {
+                    "name": "cScoreGrade"
+                }
+            ],
+            [
+                {
+                    "name": "cDeepReport"
+                },
+                false
+            ]
+        ],
+        "style": "default",
+        "noteStyle": "info",
+        "label": ""
+    }
+]

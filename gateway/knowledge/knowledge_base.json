@@ -1,0 +1,353 @@
+{
+  "company_info": {
+    "name": "DZAT",
+    "full_name": "Dongguan Dzat Manufacturing Co., Ltd.",
+    "business_type": "ODM/OEM Manufacturer",
+    "products": ["Disposable Vapes", "Pod Systems", "CBD/THC Devices", "Vaping Accessories"],
+    "specialty": "Vaping hardware manufacturing and customization",
+    "location": "Dongguan, China",
+    "established": "2015",
+    "factory_size": "5000+ square meters",
+    "employees": "200+",
+    "website": "https://www.dzatvape.com",
+    "whatsapp": "+86 17727569685",
+    "email": "dzat@dzatvape.com",
+    "slogan": "Innovation in Every Puff"
+  },
+  "products": {
+    "disposable_vapes": {
+      "name": "Disposable Vapes",
+      "puff_count": "3000-15000 puffs",
+      "coil_types": ["Mesh Coil", "Ceramic Coil", "Cotton Coil", "Dual Coil"],
+      "battery": "400mAh-850mAh rechargeable",
+      "price_range": "$3.5 - $12 per unit (FOB Shenzhen)",
+      "features": [
+        "Type-C fast charging",
+        "LED battery indicator",
+        "Multiple flavor options",
+        "Adjustable airflow (optional)",
+        "Child-lock protection",
+        "Leak-proof design"
+      ],
+      "customization": [
+        "Custom colors and finishes",
+        "Logo printing/branding",
+        "Custom packaging",
+        "Flavor customization",
+        "Puff count customization"
+      ]
+    },
+    "pod_systems": {
+      "name": "Pod Systems",
+      "types": ["Refillable Pod System", "Pre-filled Pod System", "Disposable Pod"],
+      "battery": "350mAh-1000mAh",
+      "capacity": "2ml-5ml",
+      "price_range": "$5 - $15 per unit (FOB Shenzhen)",
+      "features": [
+        "Magnetic pod connection",
+        "Draw-activated or button-activated",
+        "Leak-proof pod design",
+        "Multiple coil options",
+        "Fast Type-C charging",
+        "Compact and portable"
+      ],
+      "customization": [
+        "Device color and material",
+        "Pod design and capacity",
+        "Coil resistance options",
+        "Branding and packaging"
+      ]
+    },
+    "cbd_devices": {
+      "name": "CBD/THC Devices",
+      "types": [
+        "510 Thread Battery",
+        "Disposable CBD Pen",
+        "CBD Pod System",
+        "Wax/Dab Pen",
+        "All-in-One CBD Device"
+      ],
+      "battery": "280mAh-650mAh",
+      "voltage": "2.0V-4.2V variable voltage",
+      "price_range": "$4 - $18 per unit (FOB Shenzhen)",
+      "features": [
+        "Preheat function",
+        "Variable voltage/wattage",
+        "Universal 510 threading",
+        "Compact and discreet",
+        "Long battery life",
+        "Fast charging"
+      ],
+      "customization": [
+        "Battery capacity and size",
+        "Voltage settings",
+        "Branding and colors",
+        "Packaging design"
+      ]
+    },
+    "accessories": {
+      "name": "Vaping Accessories",
+      "products": [
+        "Charging Cables (Type-C, Micro USB)",
+        "Lanyards and Cases",
+        "Coils and Replacement Parts",
+        "Packaging Boxes",
+        "User Manuals and Inserts"
+      ],
+      "customization": "Full OEM branding available"
+    }
+  },
+  "business_terms": {
+    "moq": {
+      "title": "Minimum Order Quantity (MOQ)",
+      "odm_custom": {
+        "quantity": "5,000 units per SKU",
+        "description": "For fully custom design with your branding, colors, and specifications"
+      },
+      "oem_white_label": {
+        "quantity": "10,000 units per SKU",
+        "description": "For existing DZAT products with your branding only"
+      },
+      "stock_wholesale": {
+        "quantity": "500 units",
+        "description": "For in-stock DZAT branded products"
+      },
+      "first_order_flexibility": "We accept first trial orders of 3,000 units for ODM to help you test the market"
+    },
+    "lead_time": {
+      "title": "Production Lead Time",
+      "sample": {
+        "time": "5-7 working days",
+        "description": "For 1-3 sample units"
+      },
+      "mass_production": {
+        "time": "25-35 days after deposit",
+        "description": "For full order quantity"
+      },
+      "custom_packaging": {
+        "additional_time": "+5-7 days",
+        "description": "For custom designed packaging"
+      },
+      "shipping": {
+        "air": "7-15 days to USA/EU/UK",
+        "sea": "25-35 days to USA/EU/UK",
+        "express": "3-7 days (DHL/FedEx/UPS)"
+      }
+    },
+    "payment_terms": {
+      "title": "Payment Terms",
+      "sample_order": {
+        "terms": "100% upfront",
+        "methods": ["T/T (Bank Transfer)", "Western Union", "Wise (formerly TransferWise)"]
+      },
+      "mass_production": {
+        "terms": "30% deposit, 70% before shipment",
+        "methods": ["T/T (Bank Transfer)", "Western Union", "Alibaba Trade Assurance"],
+        "note": "30% deposit to start production, balance due before shipping. B/L released after full payment."
+      },
+      "payment_protection": "We support Alibaba Trade Assurance for secure transactions and buyer protection."
+    },
+    "sample_policy": {
+      "title": "Sample Policy",
+      "sample_fee": {
+        "amount": "$50-$150 per model",
+        "factors": "Price varies based on product complexity, customization level, and materials"
+      },
+      "shipping": {
+        "method": "Customer's DHL/FedEx account (freight collect) or $30-50 freight prepaid",
+        "time": "3-5 days to USA/EU/UK"
+      },
+      "refund_policy": "Sample fees are fully refunded or deducted from your first formal order when you place an order over $5,000."
+    },
+    "first_order_discount": {
+      "title": "First Order Discount",
+      "discount": "5% off",
+      "minimum_order": "$10,000",
+      "note": "Discount applies to first-time customers placing orders over $10,000. Cannot be combined with other promotions."
+    }
+  },
+  "certifications": {
+    "title": "Certifications & Compliance",
+    "description": "DZAT maintains comprehensive certification portfolio to ensure global market access and regulatory compliance.",
+    "markets": {
+      "usa": {
+        "name": "United States",
+        "certifications": [
+          {
+            "name": "FDA Establishment Identifier (FEI)",
+            "number": "[Your FEI Number]",
+            "description": "FDA registered establishment for tobacco product manufacturing"
+          },
+          {
+            "name": "FDA Tobacco Registration",
+            "description": "Compliant with FDA deeming regulations for vaping products"
+          },
+          {
+            "name": "California Proposition 65 Compliant",
+            "description": "Warning labels and testing for California market"
+          }
+        ],
+        "services": [
+          "Custom labeling with nicotine warnings",
+          "California-specific compliance packaging",
+          "FDA-compliant marketing materials support"
+        ]
+      },
+      "eu": {
+        "name": "European Union",
+        "certifications": [
+          {
+            "name": "CE Certification",
+            "standards": ["RoHS", "EMC", "LVD"],
+            "description": "Full CE marking for EU market entry"
+          },
+          {
+            "name": "TPD Compliant",
+            "full_name": "Tobacco Products Directive 2014/40/EU",
+            "description": "Compliant with EU vaping regulations including packaging, labeling, and nicotine limits"
+          },
+          {
+            "name": "ISO 9001:2015",
+            "description": "Quality Management System certification"
+          },
+          {
+            "name": "REACH Compliant",
+            "description": "Registration, Evaluation, Authorization and Restriction of Chemicals compliance for materials"
+          }
+        ],
+        "services": [
+          "TPD-compliant packaging and labeling",
+          "EU-specific nicotine warning labels",
+          "Multi-language packaging support",
+          "EU representative service (if needed)"
+        ]
+      },
+      "uk": {
+        "name": "United Kingdom",
+        "certifications": [
+          {
+            "name": "UKCA Marking",
+            "description": "UK Conformity Assessed marking post-Brexit"
+          },
+          {
+            "name": "MHRA Registration Support",
+            "full_name": "Medicines and Healthcare products Regulatory Agency",
+            "description": "Support for UK vaping product notification system"
+          }
+        ],
+        "services": [
+          "UK-specific compliance consulting",
+          "Post-Brexit regulatory guidance"
+        ]
+      },
+      "canada": {
+        "name": "Canada",
+        "certifications": [
+          {
+            "name": "HC Registration Guidance",
+            "full_name": "Health Canada",
+            "description": "Guidance on Canadian vaping product regulations"
+          }
+        ],
+        "services": [
+          "Bilingual labeling (English/French)",
+          "Canadian market compliance support"
+        ]
+      }
+    },
+    "quality_standards": {
+      "title": "Quality Standards & Manufacturing Excellence",
+      "standards": [
+        {
+          "name": "GMP Certified Manufacturing",
+          "full_name": "Good Manufacturing Practice",
+          "description": "Pharmaceutical-grade manufacturing standards"
+        },
+        {
+          "name": "ISO 7 Clean Room Production",
+          "description": "Class 10,000 clean room environment for assembly"
+        },
+        {
+          "name": "100% Product Inspection",
+          "description": "Every unit tested for functionality, airflow, and safety"
+        },
+        {
+          "name": "Full Traceability System",
+          "description": "Batch tracking from raw materials to finished goods"
+        }
+      ]
+    },
+    "documentation": {
+      "title": "Available Documentation",
+      "available_documents": [
+        "Certificates of Analysis (COA) for each batch",
+        "Material Safety Data Sheets (MSDS)",
+        "Product Specifications and Technical Data Sheets",
+        "Compliance Declarations and Certificates",
+        "Third-party Test Reports",
+        "ISO 9001:2015 Certificate",
+        "CE, RoHS, EMC, LVD Test Reports"
+      ],
+      "request_process": "All certificates and documentation can be provided upon request with NDA signing for confidential information."
+    }
+  },
+  "contact_info": {
+    "title": "Contact Information",
+    "company": "DZAT Technology Co., Ltd.",
+    "address": "Building X, Yuehai Industrial Park, Nanshan District, Shenzhen, China 518000",
+    "sales_team": {
+      "email": "sales@dzat.com",
+      "whatsapp": "+86 755 XXXX XXXX",
+      "wechat": "DZAT_Sales",
+      "skype": "dzat.sales"
+    },
+    "support_team": {
+      "email": "support@dzat.com",
+      "whatsapp": "+86 755 XXXX XXXX"
+    },
+    "business_hours": {
+      "days": "Monday to Saturday",
+      "hours": "9:00 AM - 6:00 PM",
+      "timezone": "GMT+8 (Beijing Time)",
+      "holidays": "Chinese National Holidays"
+    },
+    "response_time": {
+      "urgent": "Within 2 hours during business hours",
+      "general": "Within 24 hours",
+      "quotes": "2-3 business days for complex quotations"
+    }
+  },
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "questions": [
+      {
+        "question": "Are you a manufacturer or trading company?",
+        "answer": "DZAT is a direct manufacturer with our own factory in Shenzhen, China. We specialize in ODM/OEM services for vaping hardware. We welcome factory visits and inspections by appointment. Our facility includes ISO 7 clean rooms, advanced production lines, and comprehensive quality testing laboratories."
+      },
+      {
+        "question": "Can you customize flavors?",
+        "answer": "As a hardware manufacturer, DZAT focuses on device production and does not produce e-liquid or flavors. However, we can recommend reliable flavor suppliers we've worked with, or you can use your own flavor suppliers. We can also provide empty devices that are compatible with various e-liquid formulations."
+      },
+      {
+        "question": "What makes your products different from others?",
+        "answer": "DZAT's key differentiators include: 1) Premium coil technology (mesh/ceramic/cotton options) for superior flavor and longevity; 2) Strict quality control with 100% product inspection and ISO 7 clean room production; 3) Fast customization with 25-35 day lead times; 4) Full compliance support including FDA, CE, and ISO certifications; 5) Comprehensive after-sales support and warranty coverage."
+      },
+      {
+        "question": "Do you provide packaging design?",
+        "answer": "Yes, DZAT provides full OEM services including packaging design. Our in-house design team can create custom packaging based on your brand guidelines, target market requirements, and regulatory compliance needs. We can also work with your existing design files. Our packaging services include box design, insert cards, user manuals, and compliance labeling."
+      },
+      {
+        "question": "What is your warranty policy?",
+        "answer": "DZAT provides comprehensive warranty coverage: 1) Product warranty against manufacturing defects with free replacement for defective units; 2) After-sales technical support with dedicated support team; 3) Free replacement for confirmed defective products within warranty period; 4) Continuous product improvement based on customer feedback. Specific warranty terms vary by product type and will be detailed in the sales contract. We also offer extended warranty options for bulk orders."
+      },
+      {
+        "question": "How do I start working with DZAT?",
+        "answer": "Getting started with DZAT is easy: 1) Initial Contact - Reach out via email (sales@dzat.com) or WhatsApp with your company information and product interests; 2) Consultation - Our sales team will discuss your requirements, provide product recommendations, and answer your questions; 3) Sample Request - Order samples to evaluate our quality (sample fees apply, refundable on bulk orders); 4) Quotation - Receive detailed quotation based on your specifications and quantity; 5) Contract & Production - Sign contract, pay deposit, and we begin production; 6) Delivery - Quality inspection, final payment, and shipment. We guide you through every step of the process."
+      },
+      {
+        "question": "Can I visit your factory?",
+        "answer": "Absolutely! DZAT welcomes factory visits and inspections. We believe transparency builds trust, and we are proud to show our manufacturing capabilities. To arrange a visit: 1) Contact us at least 1-2 weeks in advance to schedule; 2) Provide your company details and preferred dates; 3) We will prepare an agenda including factory tour, production line observation, quality lab visit, and meeting with our team; 4) We can also assist with local transportation and accommodation recommendations. Factory visits help you understand our capabilities, quality control processes, and build a stronger business relationship. We look forward to hosting you in Shenzhen!"
+      }
+    ]
+  }
+}

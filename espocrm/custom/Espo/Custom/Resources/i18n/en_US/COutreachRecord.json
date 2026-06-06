@@ -1,0 +1,12 @@
+{
+    "fields": {
+        "outreachPlatform": "平台",
+        "outreachStatus": "状态",
+        "outreachMessage": "消息内容",
+        "outreachLeadId": "关联线索ID"
+    },
+    "links": [],
+    "labels": {
+        "Create COutreachRecord": "Create 触达记录"
+    }
+}

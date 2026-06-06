@@ -1,0 +1,207 @@
+# DZAT B2B — Docker Compose (stable)
+version: '3.8'
+
+services:
+  # ── Nginx ────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: dzat-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - espocrm
+      - chatwoot-rails
+      - gateway
+    restart: unless-stopped
+
+  # ── EspoCRM + MySQL ─────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: dzat-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: espocrm
+      MYSQL_USER: espocrm
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  espocrm:
+    image: espocrm/espocrm:latest
+    container_name: dzat-espocrm
+    ports:
+      - "8080:80"
+    environment:
+      ESPOCRM_DATABASE_HOST: mysql
+      ESPOCRM_DATABASE_USER: espocrm
+      ESPOCRM_DATABASE_PASSWORD: ${MYSQL_PASSWORD}
+      ESPOCRM_DATABASE_NAME: espocrm
+      ESPOCRM_ADMIN_USERNAME: ${ESPO_ADMIN_USER}
+      ESPOCRM_ADMIN_PASSWORD: ${ESPO_ADMIN_PASSWORD}
+      ESPOCRM_SITE_URL: http://${SERVER_IP}
+    volumes:
+      - espocrm_data:/var/www/html
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Chatwoot + PostgreSQL + Redis ───────────────
+  postgres:
+    image: postgres:15
+    container_name: dzat-postgres
+    environment:
+      POSTGRES_USER: chatwoot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: chatwoot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatwoot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: dzat-redis
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  chatwoot-rails:
+    image: chatwoot/chatwoot:v3.12.0
+    container_name: dzat-chatwoot
+    command: ["sh", "-c", "bundle exec rails server -b 0.0.0.0 -p 3000"]
+    ports:
+      - "3000:3000"
+    environment:
+      RAILS_ENV: production
+      NODE_ENV: production
+      SECRET_KEY_BASE: ${CHATWOOT_SECRET}
+      FRONTEND_URL: http://${SERVER_IP}:3000
+      DATABASE_URL: postgresql://chatwoot:${POSTGRES_PASSWORD}@postgres:5432/chatwoot
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: chatwoot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DATABASE: chatwoot
+      REDIS_URL: redis://redis:6379
+      ACTIVE_STORAGE_SERVICE: local
+      RAILS_LOG_TO_STDOUT: "true"
+      SMTP_ADDRESS: ${SMTP_HOST}
+      SMTP_PORT: "587"
+      SMTP_USERNAME: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_AUTHENTICATION: plain
+      SMTP_ENABLE_STARTTLS_AUTO: "true"
+      MAILER_SENDER_EMAIL: ${SMTP_USER}
+    volumes:
+      - chatwoot_data:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  chatwoot-sidekiq:
+    image: chatwoot/chatwoot:v3.12.0
+    container_name: dzat-chatwoot-sidekiq
+    command: ["bundle", "exec", "sidekiq", "-C", "config/sidekiq.yml"]
+    environment:
+      RAILS_ENV: production
+      SECRET_KEY_BASE: ${CHATWOOT_SECRET}
+      DATABASE_URL: postgresql://chatwoot:${POSTGRES_PASSWORD}@postgres:5432/chatwoot
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: chatwoot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DATABASE: chatwoot
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://${SERVER_IP}:3000
+      SMTP_ADDRESS: ${SMTP_HOST}
+      SMTP_PORT: "587"
+      SMTP_USERNAME: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_AUTHENTICATION: plain
+      SMTP_ENABLE_STARTTLS_AUTO: "true"
+      MAILER_SENDER_EMAIL: ${SMTP_USER}
+    volumes:
+      - chatwoot_data:/app/storage
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  # ── WAHA ─────────────────────────────────────────
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: dzat-waha
+    ports:
+      - "3001:3000"
+    environment:
+      WHATSAPP_API_HOSTNAME: 0.0.0.0
+      WAHA_API_KEY: 02e9412ac92947d0a1412739957b0fd2
+      WAHA_DASHBOARD_USERNAME: admin
+      WAHA_DASHBOARD_PASSWORD: 6724f395c61b4573987a32faf9f7c101
+      WHATSAPP_START_SESSION: "true"
+      WHATSAPP_RESTART_ALL_SESSIONS: "true"
+      WHATSAPP_HOOK_URL: http://gateway:8000/api/waha/webhook
+      WHATSAPP_HOOK_EVENTS: message
+    volumes:
+      - ./waha:/app/.sessions
+    restart: unless-stopped
+
+  # ── Gateway API ──────────────────────────────────
+  gateway:
+    build: ./gateway
+    container_name: dzat-gateway
+    environment:
+      - ENV=production
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - WECHAT_WEBHOOK_URL=${WECHAT_WEBHOOK_URL}
+      - ESPOCRM_URL=http://espocrm
+      - ESPOCRM_API_KEY=${ESPO_API_KEY}
+      - CHATWOOT_URL=http://chatwoot-rails:3000
+      - CHATWOOT_API_TOKEN=${CHATWOOT_API_TOKEN}
+      - CHATWOOT_ACCOUNT_ID=1
+      - CHATWOOT_INBOX_ID=1
+      - WAHA_URL=http://waha:3000
+      - WAHA_API_KEY=02e9412ac92947d0a1412739957b0fd2
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./gateway/app:/app/app
+      - ./gateway/knowledge:/app/knowledge
+    depends_on:
+      - espocrm
+      - chatwoot-rails
+      - waha
+    restart: unless-stopped
+
+  # ── Uptime Kuma ─────────────────────────────────
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: dzat-uptime
+    ports:
+      - "3002:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  espocrm_data:
+  postgres_data:
+  redis_data:
+  chatwoot_data:
+  uptime_kuma_data:
