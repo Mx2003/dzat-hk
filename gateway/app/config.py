@@ -30,3 +30,5 @@ DEEPSEEK_FLASH_MODEL = _env("DEEPSEEK_FLASH_MODEL", "deepseek-v4-flash")
 WECHAT_WEBHOOK_URL = _env("WECHAT_WEBHOOK_URL")
 
 KNOWLEDGE_DIR = Path(_env("KNOWLEDGE_DIR", "/app/knowledge"))
+
+REDIS_URL = _env("REDIS_URL", "redis://redis:6379/0")

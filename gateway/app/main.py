@@ -23,13 +23,38 @@ logger = logging.getLogger("gateway")
 
 import requests as _requests
 from .config import CHATWOOT_URL, CHATWOOT_API_TOKEN, CHATWOOT_ACCOUNT_ID
+from .state_store import get, set, delete, health_check as store_health
 
-# 对话历史缓存
-_conversation_store: dict[str, list[dict]] = {}
-# AI 暂停状态：True = 人工处理中，AI 不自动回复
-_ai_paused: dict[str, bool] = {}
-# 网关刚发的消息内容 → 跳过这次 webhook（防自触发）
-_last_ai_reply: dict[str, str] = {}
+# ── Redis-backed state (survives restarts) ──────
+
+def _conv_store_get(conv_key: str) -> list[dict]:
+    return get(f"conv:{conv_key}") or []
+
+def _conv_store_append(conv_key: str, msg: dict):
+    history = _conv_store_get(conv_key)
+    history.append(msg)
+    set(f"conv:{conv_key}", history, ttl=172800)  # 48h TTL
+
+def _conv_store_set_handoff(conv_key: str, ts: float):
+    set(f"handoff:{conv_key}", ts, ttl=1800)  # 30min
+
+def _conv_store_get_handoff(conv_key: str) -> float:
+    return get(f"handoff:{conv_key}") or 0
+
+def _ai_paused_get(conv_id: int) -> bool:
+    return get(f"pause:{conv_id}") or False
+
+def _ai_paused_set(conv_id: int, paused: bool):
+    set(f"pause:{conv_id}", paused, ttl=86400)  # 24h TTL
+
+def _last_reply_get(conv_id: int) -> str:
+    return get(f"last_reply:{conv_id}") or ""
+
+def _last_reply_set(conv_id: int, content: str):
+    set(f"last_reply:{conv_id}", content, ttl=300)  # 5min dedup
+
+def _last_reply_clear(conv_id: int):
+    delete(f"last_reply:{conv_id}")
 
 
 def _fetch_chatwoot_messages(conversation_id: int) -> list[dict]:
@@ -105,10 +130,10 @@ async def chatwoot_webhook(payload: dict):
         now_assigned = bool(assignee.get("id"))
         was_assigned = old_assignee and old_assignee[0] is not None if len(old_assignee) > 0 else False
         if now_assigned and not was_assigned:
-            _ai_paused[f"pause_{conversation_id}"] = True
+            _ai_paused_set(conversation_id, True)
             logger.info(f"[Chatwoot] Agent assigned → AI paused for conv={conversation_id}")
         elif not now_assigned and was_assigned:
-            _ai_paused[f"pause_{conversation_id}"] = False
+            _ai_paused_set(conversation_id, False)
             logger.info(f"[Chatwoot] Agent unassigned → AI resumed for conv={conversation_id}")
         return {"status": "assignment_handled"}
 
@@ -119,20 +144,19 @@ async def chatwoot_webhook(payload: dict):
     conversation_id = payload.get("conversation", {}).get("id", 0)
     sender = payload.get("sender", {})
     sender_type = sender.get("type", "")
-    conv_pause_key = f"pause_{conversation_id}"
 
     # ── Agent/销售 回复 ──────────────────────────
     if sender_type == "user" and sender.get("id") != sender.get("contact_id"):
         # 跳过网关自己发的消息（防自触发暂停）
-        if _last_ai_reply.get(conv_pause_key) == content or content.startswith("🤖") or content.startswith("🔴"):
-            _last_ai_reply.pop(conv_pause_key, None)
+        if _last_reply_get(conversation_id) == content or content.startswith("🤖") or content.startswith("🔴"):
+            _last_reply_clear(conversation_id)
             return {"status": "skipped_own_reply"}
 
         logger.info(f"[Chatwoot] Agent reply: {content[:50]}")
 
         cmd = content.strip().lower()
         if cmd in ("ai on", "ai resume", "/ai on", "/ai resume"):
-            _ai_paused[conv_pause_key] = False
+            _ai_paused_set(conversation_id, False)
             logger.info(f"[Chatwoot] AI resumed for conv={conversation_id}")
             _requests.post(
                 f"{CHATWOOT_URL}/api/v1/accounts/{CHATWOOT_ACCOUNT_ID}/conversations/{conversation_id}/messages",
@@ -144,7 +168,7 @@ async def chatwoot_webhook(payload: dict):
             bridge.send_chatwoot_reply(conversation_id, content)
             return {"status": "ai_resumed"}
         elif cmd in ("ai off", "ai pause", "/ai off", "/ai pause"):
-            _ai_paused[conv_pause_key] = True
+            _ai_paused_set(conversation_id, True)
             logger.info(f"[Chatwoot] AI paused manually for conv={conversation_id}")
             _requests.post(
                 f"{CHATWOOT_URL}/api/v1/accounts/{CHATWOOT_ACCOUNT_ID}/conversations/{conversation_id}/messages",
@@ -157,7 +181,7 @@ async def chatwoot_webhook(payload: dict):
             return {"status": "ai_paused"}
         else:
             # 销售发消息 → 暂停 AI
-            _ai_paused[conv_pause_key] = True
+            _ai_paused_set(conversation_id, True)
             logger.info(f"[Chatwoot] AI paused for conv={conversation_id}")
 
         # 转发到 WAHA
@@ -177,17 +201,18 @@ async def chatwoot_webhook(payload: dict):
     # 客户发消息 → 如果之前被销售暂停，检测是否恢复
     customer_name = sender.get("name", "Customer")
 
-    if conversation_key not in _conversation_store:
-        _conversation_store[conversation_key] = []
-    _conversation_store[conversation_key].append({"role": "user", "content": content})
+    # 加载/创建对话历史（Redis 持久化）
+    conversation_history = _conv_store_get(conversation_key)
+    _conv_store_append(conversation_key, {"role": "user", "content": content})
+    conversation_history.append({"role": "user", "content": content})
 
     # ── AI 暂停检查 ──────────────────────────────
-    if _ai_paused.get(conv_pause_key, False):
+    if _ai_paused_get(conversation_id):
         logger.info(f"[RAG] AI paused for conv={conversation_id}, skipping auto-reply")
         # 仍然检查转人工提醒
         rag = get_rag()
         notifier = get_notifier()
-        if rag.should_handoff(_conversation_store[conversation_key]):
+        if rag.should_handoff(conversation_history):
             _send_handoff(conversation_key, conversation_id, customer_name, sender, notifier, rag)
         return {"status": "ai_paused", "reason": "human handling conversation"}
 
@@ -196,20 +221,20 @@ async def chatwoot_webhook(payload: dict):
     notifier = get_notifier()
 
     # 转人工提醒
-    if rag.should_handoff(_conversation_store[conversation_key]):
+    if rag.should_handoff(conversation_history):
         _send_handoff(conversation_key, conversation_id, customer_name, sender, notifier, rag)
 
     # AI 生成回复
-    reply = rag.generate_reply(content, _conversation_store[conversation_key])
-    _conversation_store[conversation_key].append({"role": "assistant", "content": reply})
+    reply = rag.generate_reply(content, conversation_history)
+    _conv_store_append(conversation_key, {"role": "assistant", "content": reply})
+    conversation_history.append({"role": "assistant", "content": reply})
 
     # WAHA 发回
     bridge = get_bridge()
     sent = bridge.send_chatwoot_reply(conversation_id, reply)
 
     # 写入 Chatwoot（标记本次回复防自触发）
-    conv_pause_key2 = f"pause_{conversation_id}"
-    _last_ai_reply[conv_pause_key2] = reply
+    _last_reply_set(conversation_id, reply)
     try:
         _requests.post(
             f"{CHATWOOT_URL}/api/v1/accounts/{CHATWOOT_ACCOUNT_ID}/conversations/{conversation_id}/messages",
@@ -218,7 +243,7 @@ async def chatwoot_webhook(payload: dict):
             timeout=5,
         )
     except Exception:
-        _last_ai_reply.pop(conv_pause_key2, None)
+        _last_reply_clear(conversation_id)
 
     return {"status": "replied" if sent else "reply_failed", "reply": reply[:200]}
 
@@ -226,18 +251,18 @@ async def chatwoot_webhook(payload: dict):
 def _send_handoff(conv_key: str, conv_id: int, customer_name: str, sender: dict, notifier, rag):
     """发送转人工通知（30 分钟去重）。"""
     import time as _time
-    handoff_key = f"handoff_{conv_key}"
-    last_time = _conversation_store.get(handoff_key, 0)
     now_ts = _time.time()
+    last_time = _conv_store_get_handoff(conv_key)
     if now_ts - last_time < 1800:
         return
-    _conversation_store[handoff_key] = now_ts
+    _conv_store_set_handoff(conv_key, now_ts)
 
+    conv_history = _conv_store_get(conv_key)
     raw_phone = sender.get("phone_number", "")
     digits = "".join(c for c in raw_phone if c.isdigit())
     display_phone = raw_phone if len(digits) <= 13 else "WhatsApp"
-    all_msgs = [m["content"] for m in _conversation_store[conv_key] if m["role"] == "user"]
-    full_history = _fetch_chatwoot_messages(conv_id) or _conversation_store.get(conv_key, [])
+    all_msgs = [m["content"] for m in conv_history if m["role"] == "user"]
+    full_history = _fetch_chatwoot_messages(conv_id) or conv_history
     conv_summary = "\n> ".join(
         f"{'[客户]' if m['role']=='user' else '[AI]'} {m['content'][:80]}"
         for m in full_history[-8:]
@@ -300,4 +325,9 @@ async def trigger_outreach(platform: str = "all"):
 
 @app.get("/api/ai/status")
 async def ai_status():
-    return {"paused_conversations": list(_ai_paused.keys()), "active_conversations": list(_conversation_store.keys())}
+    from .state_store import scan_keys
+    return {
+        "paused_conversations": scan_keys("pause:*"),
+        "active_conversations": scan_keys("conv:*"),
+        "redis": store_health(),
+    }

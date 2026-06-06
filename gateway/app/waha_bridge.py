@@ -11,11 +11,12 @@ import requests
 
 from .config import WAHA_URL, WAHA_API_KEY, CHATWOOT_URL, CHATWOOT_API_TOKEN, CHATWOOT_ACCOUNT_ID, CHATWOOT_INBOX_ID
 from .espocrm_client import get_espocrm
+from .state_store import hget, hset, hdel
 
 logger = logging.getLogger("waha_bridge")
 
-# contact_id → WA chatId 映射（用于回复时找对 @lid/@c.us 格式）
-_wa_chat_ids: dict[int, str] = {}
+# contact_id → WA chatId 映射（Redis 持久化，7 天 TTL 由 state_store 管理）
+WA_MAPPING_HASH = "wa_chat_ids"
 
 
 class WahaBridge:
@@ -55,8 +56,8 @@ class WahaBridge:
         if not contact_id:
             return {"status": "contact_failed"}
 
-        # 保存 chat_id → 回复时用
-        _wa_chat_ids[contact_id] = wa_chat_id
+        # 保存 chat_id → 回复时用（Redis 持久化）
+        hset(WA_MAPPING_HASH, str(contact_id), wa_chat_id)
 
         conversation = self._create_or_append_conversation(contact_id, f"wa_{cw_phone[:50]}", text)
         if conversation:
@@ -176,8 +177,8 @@ class WahaBridge:
         except Exception:
             return False
 
-        # 从内存映射找 WA chatId
-        wa_chat_id = _wa_chat_ids.get(contact_id, "")
+        # 从 Redis 持久化映射找 WA chatId
+        wa_chat_id = hget(WA_MAPPING_HASH, str(contact_id)) or ""
         if not wa_chat_id:
             # fallback: 从 contact phone 推断
             try:
