@@ -1,0 +1,2 @@
+- [Git 版本控制设置](git-setup.md) — GitHub 仓库、远程地址、Token、标签配置
+- [修改服务器的安全流程](change-workflow.md) — 先提交再改，出问题用 git checkout 回退
