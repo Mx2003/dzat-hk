@@ -177,6 +177,7 @@ services:
       - CHATWOOT_INBOX_ID=1
       - WAHA_URL=http://waha:3000
       - WAHA_API_KEY=02e9412ac92947d0a1412739957b0fd2
+      - REDIS_URL=redis://redis:6379/0
       - POSTGRES_HOST=postgres
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
