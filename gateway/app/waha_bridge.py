@@ -10,6 +10,7 @@ from typing import Any, Optional
 import requests
 
 from .config import WAHA_URL, WAHA_API_KEY, CHATWOOT_URL, CHATWOOT_API_TOKEN, CHATWOOT_ACCOUNT_ID, CHATWOOT_INBOX_ID
+from datetime import datetime
 from .espocrm_client import get_espocrm
 from .state_store import hget, hset, hdel
 
@@ -64,13 +65,14 @@ class WahaBridge:
             conv_id = conversation.get("id")
             logger.info(f"[Bridge] conv={conv_id} contact={contact_id}")
 
-            # EspoCRM
-            phone = self._extract_phone(wa_chat_id) if "@c.us" in wa_chat_id else ""
-            if phone:
-                espocrm = get_espocrm()
-                lead = espocrm.find_lead_by_phone(phone)
-                if not lead:
-                    espocrm.create_lead({"name": sender_name, "phone": phone, "source": "inbound_whatsapp"})
+            # EspoCRM — 匹配已有 Lead 并更新聊天状态
+            espocrm = get_espocrm()
+            lead = espocrm.find_lead_by_whatsapp(wa_chat_id)
+            if lead:
+                self._update_lead_chat_status(lead["id"], "message", is_incoming=True)
+            else:
+                phone = self._extract_phone(wa_chat_id)
+                espocrm.create_lead({"name": sender_name, "phone": phone, "source": "inbound_whatsapp"})
 
             return {"status": "ok", "conv_id": conv_id}
 
@@ -160,6 +162,27 @@ class WahaBridge:
             logger.error(f"[Bridge] Conv create error: {e}")
         return None
 
+    def _update_lead_chat_status(self, lead_id: str, event: str, is_incoming: bool = False) -> None:
+        """更新 CRM Lead 的 WA 聊天状态字段。"""
+        now = datetime.now().isoformat()
+        espocrm = get_espocrm()
+        try:
+            if event == "new_session":
+                espocrm.update_lead(lead_id, {
+                    "cWaChatStatus": "聊天中",
+                    "cWaChatStart": now,
+                    "cWaLastActive": now,
+                })
+            elif event == "message":
+                fields = {"cWaLastActive": now}
+                if is_incoming:
+                    fields["cWaCustMsg"] = "1"  # CRM 端增量由反向同步补充
+                espocrm.update_lead(lead_id, fields)
+            elif event == "reply_sent":
+                espocrm.update_lead(lead_id, {"cWaLastActive": now})
+        except Exception:
+            pass
+
     def send_chatwoot_reply(self, conversation_id: int, message: str) -> bool:
         """Chatwoot webhook → RAG → WAHA 发回。"""
         headers = {"api_access_token": self._cw_token}
@@ -199,8 +222,17 @@ class WahaBridge:
         if not wa_chat_id:
             return False
 
-        logger.info(f"[Bridge] Replying to {contact_id} via {wa_chat_id[:30]}")
-        return self._waha_send_text(wa_chat_id, message)
+        ok = self._waha_send_text(wa_chat_id, message)
+        if ok:
+            # 回写 CRM Lead 最后活跃时间
+            try:
+                espocrm = get_espocrm()
+                lead = espocrm.find_lead_by_whatsapp(wa_chat_id)
+                if lead:
+                    self._update_lead_chat_status(lead["id"], "reply_sent")
+            except Exception:
+                pass
+        return ok
 
     def _waha_send_text(self, chat_id: str, text: str, session: str = "default") -> bool:
         try:

@@ -16,6 +16,7 @@ from .channels import (
     ChannelAdapter, SendResult,
     WAHAChannel, EmailChannel, LinkedInChannel, SocialDMChannel,
 )
+from ..espocrm_client import get_espocrm
 from ..config import ESPOCRM_URL, ESPOCRM_API_KEY, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_FLASH_MODEL
 
 logger = logging.getLogger("outreach")
@@ -146,13 +147,23 @@ Rules: 2-3 sentences, natural and human-sounding, no spammy tone. Include compan
             result = channel.send(lead, msg)
             result.lead_id = lead_id
 
-            # 回写 EspoCRM
+            # 回写 Lead 字段（替代 OutreachRecord）
+            espocrm = get_espocrm()
             status = "已发送" if result.success else "发送失败"
-            self._api("POST", "OutreachRecord", {
-                "cOutreachPlatform": platform,
-                "cOutreachStatus": status,
-                "cOutreachMessage": msg[:200],
-                "cOutreachLeadId": lead_id,
+            dm_field_map = {
+                "WhatsApp": "cWaDmStatus",
+                "Email": "cEmDmStatus",
+                "Instagram": "cIgDmStatus",
+                "Facebook": "cFbDmStatus",
+                "LinkedIn": "cLiDmStatus",
+                "X": "cXDmStatus",
+                "TikTok": "cTkDmStatus",
+            }
+            dm_field = dm_field_map.get(platform, "cWaDmStatus")
+            espocrm.update_lead(lead_id, {
+                dm_field: status,
+                "cLastOutreach": datetime.now().isoformat(),
+                "cLastPlatform": platform,
             })
 
             if result.success:
