@@ -1,3 +1,4 @@
+- [双机协同工作机制](synergy-workflow.md) — 通过 synergy 仓库与 Windows 传递任务，每次会话开始 pull、结束 push
 - [Git 版本控制设置](git-setup.md) — GitHub 仓库、远程地址、Token、标签配置
 - [修改服务器的安全流程](change-workflow.md) — 先提交再改，出问题用 git checkout 回退
 - [Chatwoot 版本锁定 v3.12.0](chatwoot-version-lock.md) — 永远不要升级，v4+ 的 pgvector 会炸数据库
