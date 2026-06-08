@@ -130,9 +130,15 @@ class WahaBridge:
                 self._update_lead_chat_status(lead["id"], "message", is_incoming=True)
                 hset("wa_lead_mapping", f"lid_lead:{wa_chat_id}", lead["id"])
             else:
-                # ④ 创建新 Lead
-                phone = self._extract_phone(wa_chat_id)
-                new_lead = espocrm.create_lead({"name": sender_name, "phone": phone, "source": "inbound_whatsapp"})
+                # ④ 创建新 Lead — @lid 无手机号，只传名字
+                is_lid = "@lid" in wa_chat_id
+                phone = "" if is_lid else self._extract_phone(wa_chat_id)
+                new_lead = espocrm.create_lead({
+                    "name": sender_name,
+                    "phone": phone,
+                    "source": "inbound_whatsapp",
+                    "note": f"chatId: {wa_chat_id}" if is_lid else "",
+                })
                 if new_lead:
                     hset("wa_lead_mapping", f"lid_lead:{wa_chat_id}", new_lead["id"])
                     self._update_lead_chat_status(new_lead["id"], "new_session")
