@@ -84,6 +84,11 @@ class EspoCRMClient:
         """更新线索。"""
         return self._api("PUT", f"Lead/{lead_id}", data)
 
+    def get_lead(self, lead_id: str) -> dict:
+        """获取单条线索。"""
+        result = self._api("GET", f"Lead/{lead_id}")
+        return result or {}
+
     def create_outreach_record(self, lead_id: str, platform: str, status: str, message: str = "") -> Optional[dict]:
         """创建触达记录。"""
         return self._api("POST", "OutreachRecord", {

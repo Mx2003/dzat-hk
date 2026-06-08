@@ -250,10 +250,18 @@ class WahaBridge:
                     "cWaLastActive": now,
                 })
             elif event == "message":
-                fields = {"cWaLastActive": now}
-                if is_incoming:
-                    fields["cWaCustMsg"] = "1"  # CRM 端增量由反向同步补充
-                espocrm.update_lead(lead_id, fields)
+                try:
+                    current = espocrm.get_lead(lead_id)
+                    msg_count = int(current.get("cWaMsgCount") or 0) + 1
+                    cust_count = int(current.get("cWaCustMsg") or 0) + (1 if is_incoming else 0)
+                except Exception:
+                    msg_count = 1
+                    cust_count = 1 if is_incoming else 0
+                espocrm.update_lead(lead_id, {
+                    "cWaLastActive": now,
+                    "cWaMsgCount": str(msg_count),
+                    "cWaCustMsg": str(cust_count),
+                })
             elif event == "reply_sent":
                 espocrm.update_lead(lead_id, {"cWaLastActive": now})
         except Exception:
