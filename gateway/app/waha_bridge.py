@@ -254,14 +254,23 @@ class WahaBridge:
                     current = espocrm.get_lead(lead_id)
                     msg_count = int(current.get("cWaMsgCount") or 0) + 1
                     cust_count = int(current.get("cWaCustMsg") or 0) + (1 if is_incoming else 0)
+                    old_status = current.get("cWaChatStatus") or ""
+                    new_status = "聊天中" if old_status in ("", "未启动") else old_status
+                    chat_start = current.get("cWaChatStart")
                 except Exception:
                     msg_count = 1
                     cust_count = 1 if is_incoming else 0
-                espocrm.update_lead(lead_id, {
+                    new_status = "聊天中"
+                    chat_start = None
+                fields = {
                     "cWaLastActive": now,
                     "cWaMsgCount": str(msg_count),
                     "cWaCustMsg": str(cust_count),
-                })
+                    "cWaChatStatus": new_status,
+                }
+                if not chat_start:
+                    fields["cWaChatStart"] = now
+                espocrm.update_lead(lead_id, fields)
             elif event == "reply_sent":
                 espocrm.update_lead(lead_id, {"cWaLastActive": now})
         except Exception:
