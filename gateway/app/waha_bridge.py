@@ -6,10 +6,12 @@ WAHA ↔ Chatwoot 桥接中间层。
 
 import json
 import logging
+import re
 from typing import Any, Optional
+from urllib.parse import urlparse
 import requests
 
-from .config import WAHA_URL, WAHA_API_KEY, CHATWOOT_URL, CHATWOOT_API_TOKEN, CHATWOOT_ACCOUNT_ID, CHATWOOT_INBOX_ID
+from .config import WAHA_URL, WAHA_API_KEY, CHATWOOT_URL, CHATWOOT_API_TOKEN, CHATWOOT_ACCOUNT_ID, CHATWOOT_INBOX_ID, ESPOCRM_URL, ESPOCRM_API_KEY
 from datetime import datetime
 from .espocrm_client import get_espocrm
 from .state_store import hget, hset, hdel
@@ -66,14 +68,70 @@ class WahaBridge:
             conv_id = conversation.get("id")
             logger.info(f"[Bridge] conv={conv_id} contact={contact_id}")
 
-            # EspoCRM — 匹配已有 Lead 并更新聊天状态
+            # ====== 多级匹配链 ======
             espocrm = get_espocrm()
             lead = espocrm.find_lead_by_whatsapp(wa_chat_id)
+
+            if not lead:
+                # ② Redis LID 映射（回头客）
+                saved_lead_id = hget("wa_lead_mapping", f"lid_lead:{wa_chat_id}")
+                if saved_lead_id:
+                    try:
+                        r = requests.get(
+                            f"{ESPOCRM_URL}/api/v1/Lead/{saved_lead_id}",
+                            headers={"X-Api-Key": ESPOCRM_API_KEY}, timeout=5
+                        )
+                        if r.status_code == 200:
+                            lead = r.json()
+                    except Exception:
+                        pass
+
+            if not lead:
+                # ③ 从消息提取邮箱/网站，搜 CRM
+                emails = re.findall(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}', text)
+                websites = re.findall(r'https?://[^\s]{5,100}', text)
+
+                if emails:
+                    for email in emails[:3]:
+                        r = requests.get(
+                            f"{ESPOCRM_URL}/api/v1/Lead",
+                            params={
+                                "where[0][type]": "equals",
+                                "where[0][attribute]": "emailAddress",
+                                "where[0][value]": email.strip().lower()
+                            },
+                            headers={"X-Api-Key": ESPOCRM_API_KEY}, timeout=5
+                        )
+                        if r.status_code == 200 and r.json().get("list"):
+                            lead = r.json()["list"][0]
+                            break
+
+                if not lead and websites:
+                    for url in websites[:3]:
+                        domain = urlparse(url).netloc.lower().replace("www.", "")
+                        r = requests.get(
+                            f"{ESPOCRM_URL}/api/v1/Lead",
+                            params={
+                                "where[0][type]": "contains",
+                                "where[0][attribute]": "website",
+                                "where[0][value]": domain
+                            },
+                            headers={"X-Api-Key": ESPOCRM_API_KEY}, timeout=5
+                        )
+                        if r.status_code == 200 and r.json().get("list"):
+                            lead = r.json()["list"][0]
+                            break
+
+            # 处理匹配结果
             if lead:
                 self._update_lead_chat_status(lead["id"], "message", is_incoming=True)
+                hset("wa_lead_mapping", f"lid_lead:{lead['id']}", wa_chat_id)
             else:
+                # ④ 创建新 Lead
                 phone = self._extract_phone(wa_chat_id)
-                espocrm.create_lead({"name": sender_name, "phone": phone, "source": "inbound_whatsapp"})
+                new_lead = espocrm.create_lead({"name": sender_name, "phone": phone, "source": "inbound_whatsapp"})
+                if new_lead:
+                    hset("wa_lead_mapping", f"lid_lead:{new_lead['id']}", wa_chat_id)
 
             return {"status": "ok", "conv_id": conv_id}
 
