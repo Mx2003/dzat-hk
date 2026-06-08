@@ -143,3 +143,28 @@ ssh -i d:/dzatcloudpem/dzatcloude.pem ubuntu@43.161.238.10 "docker logs dzat-gat
 2. **Chatwoot DB 已重置过** (2026-06-05)，全部配置是重建的
 3. **docker-compose.yml 改了什么重要字段**立即记录，尤其是 Chatwoot 镜像标签
 4. **Gateway 改代码只用 restart**，不用 rebuild（代码是卷挂载的）
+
+---
+
+## Windows 协同规则
+
+通过 `/opt/dzat-synergy/`（独立 git 仓库 `dzat-b2b-synergy`）与 Windows Claude Code 协同：
+
+### 会话开始时
+```bash
+cd /opt/dzat-synergy && git pull
+```
+读 `协同任务队列.md` 的 Windows → VPS 表，有任务就执行。
+
+### 任务完成后
+1. 勾掉任务，移到完成记录
+2. ```bash
+   cd /opt/dzat-synergy && git add -A && git commit -m "done: 描述" && git push
+   ```
+
+### 产生新任务时
+写入 VPS → Windows 表 → commit + push
+
+### 职责边界
+- **你管**: Docker 容器 / EspoCRM 配置 / Chatwoot+WAHA / Gateway / Nginx / MySQL+PostgreSQL
+- **Windows 管**: 获客采集 / 触达 / 看板 — 不要动这些代码

@@ -48,6 +48,27 @@ class EspoCRMClient:
             return result["list"][0]
         return None
 
+    def find_lead_by_whatsapp(self, chat_id: str) -> Optional[dict]:
+        """通过 WAHA chatId 匹配 CRM Lead。
+        chatId 格式: "17727569685@c.us" 或 "156255993749734@lid"
+        优先搜 cWhatsapp 字段，多级数字匹配，phoneNumber 兜底。
+        """
+        digits = "".join(c for c in chat_id.split("@")[0] if c.isdigit())
+        if len(digits) < 7:
+            return None
+        for n in [digits[-10:], digits[-8:]]:
+            if len(n) < 7:
+                continue
+            result = self._api("GET",
+                f"Lead?where[0][type]=contains&where[0][attribute]=cWhatsapp&where[0][value]={n}")
+            if result and result.get("list"):
+                return result["list"][0]
+        result = self._api("GET",
+            f"Lead?where[0][type]=contains&where[0][attribute]=phoneNumber&where[0][value]={digits[-10:]}")
+        if result and result.get("list"):
+            return result["list"][0]
+        return None
+
     def create_lead(self, data: dict[str, Any]) -> Optional[dict]:
         """创建新线索。自定义字段加 c 前缀。"""
         payload = {

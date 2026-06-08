@@ -95,8 +95,8 @@ def _push_dashboard():
 
 def start_scheduler():
     # _scheduler.add_job(_run_discovery, CronTrigger(hour="8,14,20", minute="0"), id="discovery")  # 获客已关
-    _scheduler.add_job(_run_outreach, CronTrigger(hour="10,16", minute="0"), id="outreach")
-    _scheduler.add_job(_push_dashboard, CronTrigger(hour="18", minute="0"), id="dashboard")
+    _scheduler.add_job(_run_outreach, CronTrigger(hour="10,16", minute="0", timezone="Asia/Hong_Kong"), id="outreach")
+    _scheduler.add_job(_push_dashboard, CronTrigger(hour="18", minute="0", timezone="Asia/Hong_Kong"), id="dashboard")
     _scheduler.start()
     logger.info("[Scheduler] started: outreach@10/16, dashboard@18")
 
