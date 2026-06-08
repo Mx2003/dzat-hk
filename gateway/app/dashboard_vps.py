@@ -12,7 +12,7 @@ def _pct(part, total):
     return f"{round(part / total * 100)}%"
 
 
-def _fetch_leads(max_size: int = 500) -> list[dict]:
+def _fetch_leads(max_size: int = 5000) -> list[dict]:
     """从 EspoCRM 拉取全量 Lead 数据"""
     h = {"X-Api-Key": ESPOCRM_API_KEY}
     all_leads = []
