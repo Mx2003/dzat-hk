@@ -33,6 +33,7 @@ class WahaBridge:
 
     def handle_waha_message(self, payload: dict) -> dict:
         """处理 WAHA webhook 推送的新消息。"""
+        logger.info(f"[Bridge] RAW PAYLOAD: {json.dumps(payload, ensure_ascii=False)[:800]}")
         event = payload.get("event", "")
         if event != "message":
             return {"status": "ignored", "event": event}
