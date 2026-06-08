@@ -247,6 +247,9 @@ class WahaBridge:
                     "cWaChatStatus": "聊天中",
                     "cWaChatStart": now,
                     "cWaMsgCount": "1",
+                    "cWaCustMsg": "1",
+                    "cWaReply": "已回复",
+                    "cLastReply": now,
                     "cWaLastActive": now,
                 })
             elif event == "message":
@@ -270,6 +273,9 @@ class WahaBridge:
                 }
                 if not chat_start:
                     fields["cWaChatStart"] = now
+                if is_incoming:
+                    fields["cWaReply"] = "已回复"
+                    fields["cLastReply"] = now
                 espocrm.update_lead(lead_id, fields)
             elif event == "reply_sent":
                 espocrm.update_lead(lead_id, {"cWaLastActive": now})

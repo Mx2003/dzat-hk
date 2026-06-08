@@ -305,6 +305,21 @@ def _send_handoff(conv_key: str, conv_id: int, customer_name: str, sender: dict,
     trigger = "3轮对话自动转接" if len(all_msgs) >= 3 and rag.classify_intent(all_msgs[-1]) != "human_request" else "客户明确请求人工"
 
     logger.info(f"[RAG] handoff: {conv_id}")
+    # 转人工 = 高意向
+    try:
+        from .espocrm_client import get_espocrm
+        import requests as _r2
+        from .config import ESPOCRM_URL, ESPOCRM_API_KEY
+        crm = get_espocrm()
+        r = _r2.get(f"{ESPOCRM_URL}/api/v1/Lead", params={
+            "where[0][type]": "equals", "where[0][attribute]": "cWaChatStatus",
+            "where[0][value]": "聊天中",
+            "sortBy": "modifiedAt", "desc": "true", "maxSize": 1
+        }, headers={"X-Api-Key": ESPOCRM_API_KEY}, timeout=5)
+        if r.ok and r.json().get("list"):
+            crm.update_lead(r.json()["list"][0]["id"], {"cWaIntent": "高"})
+    except Exception:
+        pass
     notifier.notify_handoff(
         customer_name=customer_name, phone=display_phone, language="auto",
         trigger_reason=trigger, customer_msgs=all_msgs,
