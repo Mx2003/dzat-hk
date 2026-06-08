@@ -41,54 +41,11 @@ def _run_outreach():
 
 
 def _push_dashboard():
-    """定时看板推送——从 EspoCRM 取全量数据，Python 过滤。"""
+    """定时看板推送——HTML 图表 + Playwright 截图 → 企微图片。"""
     try:
-        import requests
-        api = "http://espocrm/api/v1"
-        h = {"X-Api-Key": "3f0f4ef281df645acdc6e30bf3d406ac"}
-
-        r = requests.get(f"{api}/Lead?maxSize=100&sortBy=createdAt&desc=true", headers=h, timeout=15)
-        if r.status_code != 200:
-            logger.error(f"Dashboard API error: {r.status_code}")
-            return
-        data = r.json()
-        leads = data.get("list", [])
-        total = data.get("total", 0)
-
-        # Python 侧过滤
-        today = datetime.now().strftime("%Y-%m-%d")
-        today_count = sum(1 for l in leads if (l.get("createdAt") or "").startswith(today))
-
-        score_dist = {"S": 0, "A": 0, "B": 0, "C": 0}
-        countries = {}
-        for l in leads:
-            g = l.get("cScoreGrade") or "C"
-            score_dist[g] = score_dist.get(g, 0) + 1
-            c = l.get("addressCountry") or "?"
-            countries[c] = countries.get(c, 0) + 1
-
-        top5 = sorted(countries.items(), key=lambda x: x[1], reverse=True)[:5]
-        country_lines = "\n".join(f"> {c}: {n}" for c, n in top5)
-
-        now = datetime.now().strftime("%Y-%m-%d %H:%M")
-        md = f"""##  DZAT B2B 日报
-> {now}
-
-**线索**: {total} | 今日 +{today_count}
-**评分**: S:{score_dist['S']} A:{score_dist['A']} B:{score_dist['B']} C:{score_dist['C']}
-
-**Top 市场**:
-{country_lines}
-
----
->  DZAT Gateway 自动推送"""
-
-        requests.post(
-            "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=c5761dbf-e7e9-40a2-a678-467ed51379de",
-            json={"msgtype": "markdown", "markdown": {"content": md}},
-            timeout=10,
-        )
-        logger.info("[Scheduler] Dashboard pushed")
+        from .dashboard_vps import push_dashboard
+        ok = push_dashboard()
+        logger.info(f"[Scheduler] Dashboard {'OK' if ok else 'FAIL'}")
     except Exception as e:
         logger.error(f"[Scheduler] Dashboard error: {e}")
 
