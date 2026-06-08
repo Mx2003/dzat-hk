@@ -135,6 +135,7 @@ class WahaBridge:
                 new_lead = espocrm.create_lead({"name": sender_name, "phone": phone, "source": "inbound_whatsapp"})
                 if new_lead:
                     hset("wa_lead_mapping", f"lid_lead:{wa_chat_id}", new_lead["id"])
+                    self._update_lead_chat_status(new_lead["id"], "new_session")
 
             try:
                 from .main import broadcast_wa_event
@@ -239,6 +240,7 @@ class WahaBridge:
                 espocrm.update_lead(lead_id, {
                     "cWaChatStatus": "聊天中",
                     "cWaChatStart": now,
+                    "cWaMsgCount": "1",
                     "cWaLastActive": now,
                 })
             elif event == "message":
