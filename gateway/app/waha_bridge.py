@@ -90,6 +90,9 @@ class WahaBridge:
                 # ③ 从消息提取邮箱/网站，搜 CRM
                 emails = re.findall(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}', text)
                 websites = re.findall(r'https?://[^\s]{5,100}', text)
+                if not websites:
+                    bare = re.findall(r'(?:^|\s)([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}(?:/[^\s]*)?', text)
+                    websites = [f"https://{b.strip()}" for b in bare if '.' in b and len(b) > 5]
 
                 if emails:
                     for email in emails[:3]:
@@ -125,13 +128,13 @@ class WahaBridge:
             # 处理匹配结果
             if lead:
                 self._update_lead_chat_status(lead["id"], "message", is_incoming=True)
-                hset("wa_lead_mapping", f"lid_lead:{lead['id']}", wa_chat_id)
+                hset("wa_lead_mapping", f"lid_lead:{wa_chat_id}", lead["id"])
             else:
                 # ④ 创建新 Lead
                 phone = self._extract_phone(wa_chat_id)
                 new_lead = espocrm.create_lead({"name": sender_name, "phone": phone, "source": "inbound_whatsapp"})
                 if new_lead:
-                    hset("wa_lead_mapping", f"lid_lead:{new_lead['id']}", wa_chat_id)
+                    hset("wa_lead_mapping", f"lid_lead:{wa_chat_id}", new_lead["id"])
 
             return {"status": "ok", "conv_id": conv_id}
 
