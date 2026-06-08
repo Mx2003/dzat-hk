@@ -89,6 +89,41 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="DZAT B2B Gateway", version="1.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# ── WebSocket 事件推送 ────────────────────────────
+
+from fastapi import WebSocket, WebSocketDisconnect
+from datetime import datetime as _ws_dt
+import json as _ws_json, asyncio
+
+connected_ws: list[WebSocket] = []
+
+
+@app.websocket("/ws/events")
+async def ws_events(websocket: WebSocket):
+    await websocket.accept()
+    connected_ws.append(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
+        if websocket in connected_ws:
+            connected_ws.remove(websocket)
+
+
+def broadcast_wa_event(chat_id: str):
+    dead = []
+    msg = _ws_json.dumps({"event": "wa_message", "chat_id": chat_id, "timestamp": _ws_dt.now().isoformat()})
+    for ws in connected_ws:
+        try:
+            asyncio.create_task(ws.send_text(msg))
+        except Exception:
+            dead.append(ws)
+    for d in dead:
+        if d in connected_ws:
+            connected_ws.remove(d)
+
 
 # ── 健康检查 ─────────────────────────────────────
 

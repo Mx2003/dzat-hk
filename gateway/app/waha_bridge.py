@@ -136,6 +136,12 @@ class WahaBridge:
                 if new_lead:
                     hset("wa_lead_mapping", f"lid_lead:{wa_chat_id}", new_lead["id"])
 
+            try:
+                from .main import broadcast_wa_event
+                broadcast_wa_event(wa_chat_id)
+            except Exception:
+                pass
+
             return {"status": "ok", "conv_id": conv_id}
 
         return {"status": "ok", "conv_id": None}
