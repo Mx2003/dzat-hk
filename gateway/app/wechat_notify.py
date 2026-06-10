@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional, Any
 import requests
 
-from .config import WECHAT_WEBHOOK_URL
+from .config import WECHAT_WEBHOOK_URL, WECHAT_HANDOFF_URL
 
 logger = logging.getLogger("wechat_notify")
 
@@ -19,15 +19,17 @@ class WeChatNotifier:
 
     def __init__(self):
         self._url = WECHAT_WEBHOOK_URL
+        self._handoff_url = WECHAT_HANDOFF_URL
 
-    def _send_markdown(self, content: str) -> bool:
+    def _send_markdown(self, content: str, use_handoff: bool = False) -> bool:
         """发送 Markdown 消息。"""
-        if not self._url:
+        url = self._handoff_url if use_handoff else self._url
+        if not url:
             logger.warning("[WeChat] Webhook URL not configured")
             return False
         try:
             resp = requests.post(
-                self._url,
+                url,
                 json={"msgtype": "markdown", "markdown": {"content": content}},
                 timeout=10,
             )
@@ -81,7 +83,7 @@ class WeChatNotifier:
 ---
 > 🤖 DZAT Gateway · 请尽快在 Chatwoot 中处理"""
 
-        return self._send_markdown(md)
+        return self._send_markdown(md, use_handoff=True)
 
     def notify_alert(self, title: str, detail: str) -> bool:
         now = datetime.now().strftime("%Y-%m-%d %H:%M")

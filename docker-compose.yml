@@ -169,6 +169,7 @@ services:
       - ENV=production
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - WECHAT_WEBHOOK_URL=${WECHAT_WEBHOOK_URL}
+      - WECHAT_HANDOFF_URL=${WECHAT_HANDOFF_URL}
       - ESPOCRM_URL=http://espocrm
       - ESPOCRM_API_KEY=${ESPO_API_KEY}
       - CHATWOOT_URL=http://chatwoot-rails:3000
