@@ -1,6 +1,23 @@
-- [双机协同工作机制](synergy-workflow.md) — 通过 synergy 仓库与 Windows 传递任务
-- [不做版本控制保护](no-gitignore-protection.md) — 默认全部提交，包括 .env/缓存/WAHA 数据
-- [Git 版本控制设置](git-setup.md) — GitHub 仓库、远程地址、Token、标签配置
-- [修改服务器的安全流程](change-workflow.md) — 先提交再改，出问题用 git checkout 回退
-- [Chatwoot 版本锁定 v3.12.0](chatwoot-version-lock.md) — 永远不要升级，v4+ 的 pgvector 会炸数据库
-- [剩余待解决问题](remaining-issues.md) — 线索评分、转人工分配、知识库更新等
+# Claude Code 记忆索引
+
+项目文档已整合到 [CLAUDE.md](../CLAUDE.md)，恢复指南见 [RECOVERY.md](../RECOVERY.md)。
+
+## 关键要点
+
+- **Chatwoot = v3.12.0 永不动**: v4+ 需要 pgvector 会炸数据库
+- **Gateway 改代码只 restart**: 代码卷挂载，不用 rebuild
+- **时区 Asia/Hong_Kong**: 调度器使用 UTC+8
+- **企微 Webhook 两个独立 key**: 看板 `c50b...` / 转人工 `c576...`
+- **不做 .gitignore 保护**: 全部提交，唯一排除 `waha/webjs/`（root 权限）
+- **协同仓库**: `/opt/dzat-synergy/`，每次会话开始 pull、结束 push
+- **职责**: VPS 管 Docker/CRM/客服，Windows 管获客/触达
+
+## Git
+
+```bash
+cd /opt/dzat-b2b
+git add -A && git commit -m "描述" && git push
+git checkout stable  # 回退
+```
+- GitHub: `https://github.com/Mx2003/dzat-hk`
+- 协同: `/opt/dzat-synergy/` → `https://github.com/Mx2003/dzat-b2b-synergy`

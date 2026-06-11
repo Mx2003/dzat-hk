@@ -1,51 +1,47 @@
-# DZAT B2B 服务器 — CRM + 客服
-
-## 架构分工
-
-```
-服务器 (本项目 /opt/dzat-b2b)          本地 (D:\DZAT-B2B, Trae)
-┌──────────────────────────┐         ┌─────────────────────────┐
-│ EspoCRM :8080 (CRM中枢)  │ ←POST   │ 获客引擎                 │
-│ MySQL                    │ 线索    │ Google/社媒/关键词        │
-│                          │         │                         │
-│ Chatwoot :3000 (客服)    │  GET→   │ 触达系统                 │
-│ WAHA :3001 (WhatsApp桥)  │ 线索    │ WA/Email/LinkedIn/社媒   │
-│ Gateway (RAG+桥接)       │         │                         │
-│ PostgreSQL + Redis       │         │ 控制台 :8520             │
-│ Uptime :3002 (监控)      │         │                         │
-└──────────────────────────┘         └─────────────────────────┘
-```
+# DZAT B2B — CRM + 客服 + WhatsApp 桥接
 
 ## 服务器
 
-- IP: `43.161.238.10`
-- 系统: Ubuntu 24.04.4 LTS，腾讯云香港
-- 路径: `/opt/dzat-b2b`
-- Claude Code: v2.1.167 + DeepSeek v4-pro 已配置 (`~/.claude/settings.json`)
+- IP: `43.161.238.10` | 腾讯云香港 | Ubuntu 24.04 LTS
+- 项目路径: `/opt/dzat-b2b`
+- Claude Code: v2.1.167 + DeepSeek v4-pro (`~/.claude/settings.json`)
+- GitHub: `https://github.com/Mx2003/dzat-hk` (私有，main 分支)
+- 协同仓库: `/opt/dzat-synergy/` → `https://github.com/Mx2003/dzat-b2b-synergy`
+
+## 职责边界
+
+- **VPS (本机)**: Docker 容器 / EspoCRM / Chatwoot+WAHA / Gateway / Nginx / DB
+- **Windows (D:\DZAT-B2B)**: 获客采集 / 触达系统 / 控制台 — 不要动这些代码
+
+---
 
 ## 10 个 Docker 容器
 
 | 容器 | 镜像 | 端口 | 用途 |
 |------|------|:---:|------|
-| dzat-nginx | nginx:alpine | 80 | 反代 |
+| dzat-nginx | nginx:alpine | 80 | 反向代理 |
 | dzat-espocrm | espocrm/espocrm | 8080 | CRM (PHP+Apache) |
-| dzat-mysql | mysql:8.0 | — | EspoCRM DB |
+| dzat-mysql | mysql:8.0 | — | EspoCRM 数据库 |
 | dzat-chatwoot | chatwoot/chatwoot:**v3.12.0** | 3000 | 客服 (Rails) |
 | dzat-chatwoot-sidekiq | chatwoot/chatwoot:**v3.12.0** | — | 后台任务 |
-| dzat-postgres | postgres:15 | — | Chatwoot DB |
-| dzat-redis | redis:7-alpine | — | Chatwoot 缓存 |
+| dzat-postgres | postgres:15 | — | Chatwoot 数据库 |
+| dzat-redis | redis:7-alpine | — | Chatwoot 缓存 + Gateway 状态 |
 | dzat-waha | devlikeapro/waha | 3001 | WhatsApp 桥 |
 | dzat-gateway | 自建 FastAPI | — | 桥接+RAG+调度 |
 | dzat-uptime | louislam/uptime-kuma | 3002 | 监控 |
 
+常用命令:
 ```bash
 cd /opt/dzat-b2b
-docker compose ps        # 查看所有容器状态
+docker compose ps
 docker logs dzat-gateway --tail 50
-docker restart dzat-gateway
+docker restart dzat-gateway         # 改代码后用这个（代码卷挂载，不用 rebuild）
+docker exec dzat-espocrm php /var/www/html/command.php clear-cache
 ```
 
-## 服务访问
+---
+
+## 服务访问 & 凭证
 
 | 服务 | URL | 账号 | 密码 |
 |------|-----|------|------|
@@ -55,7 +51,7 @@ docker restart dzat-gateway
 | Gateway | http://43.161.238.10/api/health | — | — |
 | Uptime | http://43.161.238.10:3002 | — | — |
 
-## API Keys
+### API Keys
 
 | 服务 | Key | Header |
 |------|-----|--------|
@@ -64,107 +60,123 @@ docker restart dzat-gateway
 | WAHA | `02e9412ac92947d0a1412739957b0fd2` | `X-Api-Key` |
 | DeepSeek | `sk-fe1125df69154871ac06d11548dfffa6` | Bearer token |
 
-### Chatwoot API 配置
+Chatwoot: Account ID=`1`, Inbox ID=`1` (API Channel, 非原生 WhatsApp). Webhook: `http://gateway:8000/api/chatwoot/webhook`
+WAHA: Session=`default`, Bot 号码=`+86 177 2756 9685` (8617727569685@c.us)
 
-- Account ID: `1`
-- Inbox ID: `1` (WhatsApp Bridge, API Channel 类型)
-- Webhook URL: `http://gateway:8000/api/chatwoot/webhook`
+---
 
-### WAHA 配置
+## Nginx 路由
 
-- Session: `default` — WORKING
-- Bot 号码: `+86 177 2756 9685` (8617727569685@c.us)
-- API Key: `02e9412ac92947d0a1412739957b0fd2`
+| 路径 | 上游 | 说明 |
+|------|------|------|
+| `/api` | gateway:8000 | Gateway API + WebSocket |
+| `/crm/` | espocrm | 去掉 /crm/ 前缀 |
+| `/chat/` | chatwoot-rails:3000 | 支持 WebSocket upgrade |
+| `/waha/` | waha:3001 | 去掉 /waha/ 前缀 |
+| `/monitor/` | uptime-kuma:3001 | 去掉 /monitor/ 前缀 |
+
+---
 
 ## 消息流（客服链路）
 
 ```
-WhatsApp → WAHA webhook → Gateway (/api/waha/webhook)
-  → Chatwoot API 创建/追加对话
-  → Agent 在 Chatwoot 回复
-  → Chatwoot webhook → Gateway (/api/chatwoot/webhook)
-  → WAHA 发回 WhatsApp
+WhatsApp → WAHA webhook → Gateway /api/waha/webhook
+  → WahaBridge 多级匹配:
+      ① find_lead_by_whatsapp(WA号码)
+      ② Redis wa_lead_mapping（回头客 LD 映射）
+      ③ 消息中提取邮箱/网站搜 CRM
+      ④ 创建新 Lead + 初始化聊天状态字段
+  → Chatwoot API 创建/追加对话 → webhook 回到 Gateway
+  → RAG 引擎 (DeepSeek 多语言) 生成回复
+  → WAHA 发回 WhatsApp + 写 CRM 字段 (cWaChatStatus/cWaMsgCount/cWaReply...)
+  → 转人工条件: 3条消息 或 客户说 human/人工 → 企微通知
 ```
 
-Chatwoot Inbox 是 API Channel 类型（id=1），不是原生 WhatsApp inbox。Gateway 充当桥接中枢。
-
-## Gateway 部署
-
-Gateway 代码卷挂载到 `./gateway/app:/app/app`，改代码只需 restart：
-
-```bash
-# 本地上传 (从 d:/DZAT-B2B-Claude/server/)
-scp -i d:/dzatcloudpem/dzatcloude.pem gateway/app/XXX.py ubuntu@43.161.238.10:/opt/dzat-b2b/gateway/app/XXX.py
-
-# 重启
-ssh -i d:/dzatcloudpem/dzatcloude.pem ubuntu@43.161.238.10 "docker restart dzat-gateway"
-
-# 看日志
-ssh -i d:/dzatcloudpem/dzatcloude.pem ubuntu@43.161.238.10 "docker logs dzat-gateway --tail 20"
-```
-
-## 定时任务 (scheduler.py)
-
-```python
-# discovery: 8/14/20点 → 已关闭 (获客计划移到本地)
-# outreach:  10/16点  → 已关闭 (触达计划移到本地)
-# dashboard: 18点     → 暂停
-```
-
-获客和触达已迁移到本地 `D:\DZAT-B2B`，服务器只跑客服。
-
-## AI 客服控制
-
-在 Chatwoot 对话中输入：
-
-| 命令 | 效果 |
-|------|------|
-| `ai off` / `ai pause` | 暂停 AI 自动回复 |
-| `ai on` / `ai resume` | 恢复 AI 自动回复 |
-| Agent 手动回复客户 | 自动暂停 AI |
-
-状态存 Gateway 内存，重启丢失。
-
-## EspoCRM 线索结构
-
-标准字段: name, firstName, lastName, website, emailAddress, phoneNumber, addressCountry, status, description
-
-自定义字段 (c前缀):
-- `cLeadScore` (int) — AI 评分 0-100
-- `cScoreGrade` (varchar) — S/A/B/C
-- `cSourceKeywords` (varchar) — 搜索关键词
-- `cDeepReport` (text) — AI 深度分析
-- `cWhatsapp` (varchar) — WA 号码
-- `cLeadCountry` (varchar) — 国家
-
-## ⚠️ 关键警告
-
-1. **Chatwoot 永远 v3.12.0** — 别碰 `latest`！v4+ 的 Captain AI 需要 pgvector，会炸数据库
-2. **Chatwoot DB 已重置过** (2026-06-05)，全部配置是重建的
-3. **docker-compose.yml 改了什么重要字段**立即记录，尤其是 Chatwoot 镜像标签
-4. **Gateway 改代码只用 restart**，不用 rebuild（代码是卷挂载的）
+Chatwoot Inbox 是 API Channel，Gateway 是桥接中枢。
 
 ---
 
-## Windows 协同规则
+## AI 客服
 
-通过 `/opt/dzat-synergy/`（独立 git 仓库 `dzat-b2b-synergy`）与 Windows Claude Code 协同：
+- **RAG 引擎**: DeepSeek V4 Flash，FAQ 知识库 + 多语言自动检测回复
+- **知识库**: `gateway/knowledge/knowledge_base.json` (6 模块: 公司/产品/商务/认证/联系/FAQ)
+- **多语言**: 自动检测客户语言并以同语言回复，对话中可切换语言
+- **转人工**: 3 条消息或明确请求 → 企微通知 (独立 webhook)
+- **AI 控制**: Chatwoot 对话中发 `ai on/off` 切换
 
-### 会话开始时
+---
+
+## 定时任务
+
+| 任务 | 时间 | 状态 |
+|------|------|:---:|
+| discovery | 8/14/20 | 已关闭（获客移 Windows） |
+| outreach | 10:00, 16:00 | 运行中（Asia/HK） |
+| dashboard | 18:00 | 运行中（Asia/HK，HTML 图表截图→企微） |
+
+---
+
+## CRM: 角色权限 & 分配
+
+| 角色 | 权限 | 用户 |
+|------|------|------|
+| 管理员 | 全部 | admin, maxiaowei, zouyuhang |
+| 经理 (外贸) | 团队可见 | wangjiahui |
+| 业务员 (外贸) | 只自己 | chenruipeng, guolisiqin |
+| 业务员 (内贸) | 只自己 | mayi, penghaohang |
+
+- 外贸组: 非中国客户 | 内贸组: 中国客户
+- 分配规则: 轮询，470 条线索已分配
+- 业务员只能看/编辑自己的 Lead/Contact/Account
+
+---
+
+## Gateway 架构
+
+| 模块 | 文件 | 功能 |
+|------|------|------|
+| API 入口 | `main.py` | FastAPI + `/ws/events` WebSocket |
+| WA 桥接 | `waha_bridge.py` | WAHA ↔ Chatwoot + 四级 Lead 匹配链 |
+| RAG 引擎 | `rag_engine.py` | DeepSeek 多语言 FAQ + 回复生成 |
+| EspoCRM | `espocrm_client.py` | Lead CRUD + 聊天状态更新 |
+| 调度器 | `scheduler.py` | outreach 10/16 + dashboard 18 (HK) |
+| 看板 | `dashboard_vps.py` | HTML+SVG 图表 → Playwright 截图 → 企微图片 |
+| 企微通知 | `wechat_notify.py` | 转人工通知 (独立 webhook) + 看板推送 |
+| 状态存储 | `state_store.py` | Redis 持久化 (对话/AI暂停/WA映射) |
+| 外联 | `outreach/dispatcher.py` | 多渠道 DM 触达 + Lead 字段更新 |
+| 获客 | `discovery/` | LangGraph 获客引擎 (API 手动触发) |
+
+Gateway 代码卷挂载 `./gateway/app:/app/app`，改代码只需 `docker restart dzat-gateway`。
+
+---
+
+## 企微 Webhook
+
+| 用途 | Key |
+|------|-----|
+| 看板推送 | `c50b51b4-a729-4cf0-9469-9bdf003b01da` |
+| 转人工通知 | `c5761dbf-e7e9-40a2-a678-467ed51379de` |
+
+---
+
+## ⚠️ 关键警告
+
+1. **Chatwoot 永远 v3.12.0** — 别碰 `latest`！v4+ 需要 pgvector 会炸数据库
+2. Chatwoot DB 已重置过 (2026-06-05)，全部配置是重建的
+3. **Gateway 改代码只用 restart**，不用 rebuild（代码卷挂载）
+4. docker-compose.yml 改任何重要字段必须用 Git 记录
+5. **不做 .gitignore 保护** — 所有文件默认提交（包括 .env/缓存），唯一排除 `waha/webjs/`（root 权限无法提交）
+6. 任务通过 `/opt/dzat-synergy/` 与 Windows 传递：会话开始 pull → 执行 → push
+
+---
+
+## Git 工作流
+
 ```bash
-cd /opt/dzat-synergy && git pull
+cd /opt/dzat-b2b
+git status                  # 看改动
+git add -A && git commit -m "描述" && git push   # 提交+推送
+git checkout stable         # 回退到稳定版
 ```
-读 `协同任务队列.md` 的 Windows → VPS 表，有任务就执行。
 
-### 任务完成后
-1. 勾掉任务，移到完成记录
-2. ```bash
-   cd /opt/dzat-synergy && git add -A && git commit -m "done: 描述" && git push
-   ```
-
-### 产生新任务时
-写入 VPS → Windows 表 → commit + push
-
-### 职责边界
-- **你管**: Docker 容器 / EspoCRM 配置 / Chatwoot+WAHA / Gateway / Nginx / MySQL+PostgreSQL
-- **Windows 管**: 获客采集 / 触达 / 看板 — 不要动这些代码
+`stable` 标签指向当前稳定状态，重大改动后更新: `git tag -d stable && git tag -a stable -m "..." && git push origin stable --force`
